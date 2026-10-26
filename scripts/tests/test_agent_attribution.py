@@ -44,6 +44,7 @@ class PolicyTests(unittest.TestCase):
 
     def test_valid_topology(self):
         validate(self.event("dev", "feature/work"))
+        validate(self.event("dev", "hotfix/work"))
         validate(self.event("main", "dev"))
 
     def test_main_rejects_feature_or_fork(self):

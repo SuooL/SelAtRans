@@ -1,6 +1,6 @@
 # Development workflow
 
-Protected branches:
+The default branch is `dev`. Protected branches:
 
 ```text
 main ← release PR (merge commit) ← dev ← feature PR (squash) ← feature/*
@@ -9,6 +9,9 @@ main ← release PR (merge commit) ← dev ← feature PR (squash) ← feature/*
 `main` and `dev` require a PR, current-base CI, resolved conversations, and the
 three checks `Validate`, `Secret scan`, and `PR policy`. Administrators are also
 subject to protection. Force pushes and deletion are disabled.
+GitHub automatically deletes merged feature/fix/hotfix/chore branches. Protected
+`main` and `dev` are retained, including after release PRs. Remove local temporary
+branches only after confirming successful remote merge and no remaining work.
 
 The repository permits auto-merge. Each PR opts into auto-merge using `gh pr
 merge --auto --squash` for a feature or `gh pr merge --auto --merge` for a release.
@@ -19,8 +22,7 @@ supports a single maintainer; passing CI is not independent human review.
 git fetch origin
 git switch -c feature/my-change origin/dev
 git config core.hooksPath .githooks
-scripts/check.sh
-scripts/secret-scan.sh
+scripts/ci-test.sh
 git add <specific-files>
 git diff --cached --check
 git commit -m 'feat: describe the resulting behavior'
@@ -31,9 +33,11 @@ gh pr checks --watch
 ```
 
 PR titles use `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, or `release:`.
-The complete local gate is `scripts/check.sh` plus `scripts/secret-scan.sh`.
-During repository bootstrap, `check.sh` validates shell syntax and whitespace;
-the application PR extends it with build, tests, and app packaging.
+The complete local gate is `scripts/ci-test.sh`. It must pass before every commit
+and before PR creation; the pre-commit hook enforces it. Never bypass the hook.
+`check.sh` validates shell syntax, workflow/version rules, whitespace, the core
+checks, a production build, and signed app packaging. It requires macOS Command
+Line Tools, Python 3, and network access for pinned build dependencies.
 
 ## Agent attribution
 

@@ -1,4 +1,4 @@
 #!/bin/bash
 set -euo pipefail
-scripts/secret-scan.sh
+scripts/ci-test.sh
 git diff --cached --check
