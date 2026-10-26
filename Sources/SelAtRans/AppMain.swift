@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let selection = SelectionService()
     private let hotKey = HotKeyManager(id: 1)
     private let chineseHotKey = HotKeyManager(id: 2)
-    private let keychain = KeychainStore()
+    private let credentials = CredentialStore()
     private var updater: AppUpdater?
     private lazy var indicator = FloatingIndicator(preferences: preferences)
     private var settings: SettingsWindowController?
@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         indicator.onSettings = { [weak self] in self?.openSettings() }
         indicator.onTogglePause = { [weak self] in self?.togglePause() }
+        indicator.onTranslateClipboard = { [weak self] direction in self?.translate(direction: direction, clipboardOnly: true) }
         hotKey.onFire = { [weak self] in self?.translate(direction: .toEnglish) }
         chineseHotKey.onFire = { [weak self] in self?.translate(direction: .toChinese) }
         indicator.show()
@@ -57,8 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         indicator.synchronizePermission(granted: selection.isTrusted)
     }
 
-    private func translate(direction: TranslationDirection) {
-        guard !paused, translationTask == nil else { return }
+    private func translate(direction: TranslationDirection, clipboardOnly: Bool = false) {
+        guard (!paused || clipboardOnly), translationTask == nil else { return }
         indicator.beginTranslation(direction: direction)
         translationTask = Task { [weak self] in
             guard let self else { return }
@@ -67,9 +68,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let profile = preferences.profiles.active else { throw TranslationError.missingModel }
                 let config = profile.configuration
                 try config.validate()
-                let key = try keychain.read(account: profile.credentialAccount()) ?? ""
+                let key = try credentials.read(account: profile.credentialAccount()) ?? ""
                 guard !key.isEmpty else { throw TranslationError.missingKey }
-                let input = try await selection.capture()
+                let input: CapturedInput
+                if clipboardOnly { input = selection.captureClipboard() }
+                else { input = try await selection.capture() }
                 try Task.checkCancellation()
                 contextGuard = ContextGuard(input: input)
                 let translation = try await TranslationClient().translate(input.text, configuration: config, key: key, direction: direction) { [weak self] delta in

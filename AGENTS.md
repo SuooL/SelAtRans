@@ -10,7 +10,8 @@
 - Local/release apps use a stable Apple signing identity. CI ad-hoc artifacts
   are staging only. Never export the user's Apple certificate private key.
 - Never log user text, translations, API keys, authorization headers, or response bodies.
-- Store API keys only in Keychain. Never add credential files or user configuration.
+- Store API keys only in the app's private Application Support directory (0700/0600).
+  Never access legacy API Keychain items or add credential files or user configuration to Git.
 
 ## Branch and PR workflow
 

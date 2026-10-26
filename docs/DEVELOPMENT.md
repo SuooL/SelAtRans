@@ -56,9 +56,10 @@ setting uses the PR body, preserving attribution after feature merge. The
 `commit-msg` hook verifies attribution; tests cover all three supported agents.
 
 Secret scanning uses checksum-pinned Gitleaks. The local pre-commit hook scans
-the working tree; CI scans the tree and complete fetched Git history. Ignored
-local credentials are never an acceptable configuration mechanism for this app:
-enter keys in the settings window and store them in Keychain instead.
+the working tree and history; CI also scans the complete fetched Git history.
+Enter keys in the settings window; the app stores them in its private Application
+Support directory, outside the repository. Never add local credential files to
+Git or use real credentials in tests. API Keychain access has been removed.
 
 ## Manual verification
 
