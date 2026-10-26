@@ -5,6 +5,11 @@ if [[ "$#" != 3 ]]; then
     echo "Usage: scripts/pr.sh BASE TITLE BODY_FILE" >&2
     exit 1
 fi
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo 'Commit the intended changes before creating a PR.' >&2
+    exit 1
+fi
+scripts/ci-test.sh
 body_file="$(mktemp "${TMPDIR:-/tmp}/selatrans-pr.XXXXXX")"
 trap 'rm -f "$body_file"' EXIT
 python3 -B scripts/agent_attribution.py body "$3" > "$body_file"

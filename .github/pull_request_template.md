@@ -4,8 +4,7 @@ Describe the concrete problem and resulting behavior.
 
 ## Validation
 
-- [ ] `scripts/check.sh`
-- [ ] `scripts/secret-scan.sh`
+- [ ] Complete `scripts/ci-test.sh` passed locally before commit and PR creation
 - [ ] Manual checks or important unverified behavior described below
 
 ## Sensitive data
