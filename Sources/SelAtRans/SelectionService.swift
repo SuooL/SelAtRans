@@ -17,7 +17,7 @@ enum SelectionError: Error, LocalizedError {
         case .permission: return "请在系统设置 → 隐私与安全性 → 辅助功能中允许 SelAtRans。"
         case .secureInput: return "当前处于安全输入状态，未读取或发送文字。"
         case .contextChanged: return "读取文字时焦点发生变化，请重新选择后重试。"
-        case .copyUnavailable: return "无法读取选中文字，请先手动复制，再按快捷键。"
+        case .copyUnavailable: return "无法确认当前选区，未使用旧剪贴板。请手动复制，再从浮标右键选择翻译剪贴板。"
         case .modifiersHeld: return "请松开快捷键后重试。"
         }
     }
@@ -30,6 +30,10 @@ final class SelectionService {
     func requestPermission() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+
+    func captureClipboard() -> CapturedInput {
+        CapturedInput(text: NSPasteboard.general.string(forType: .string) ?? "", snapshot: nil, element: nil, window: nil)
     }
 
     func capture() async throws -> CapturedInput {
@@ -50,20 +54,19 @@ final class SelectionService {
         }
         guard sameFocus(pid: pid, original: focus), !IsSecureEventInputEnabled() else { throw SelectionError.contextChanged }
 
-        if let focus, let selected = string(focus, kAXSelectedTextAttribute), !selected.isEmpty {
-            return input(text: selected, element: focus, pid: pid)
+        // Search the focused subtree before treating an empty container range as no selection.
+        var budget = 100
+        var selectionReported = false
+        if let focus, let selected = findSelection(focus, budget: &budget, depth: 0, selectionReported: &selectionReported) {
+            return try input(text: selected.1, element: selected.0, pid: pid)
         }
-        let clipboardText = NSPasteboard.general.string(forType: .string)
-        // An editable field with an empty selection must use clipboard input, not copy a line.
-        if let focus, isTextInput(focus), (selectedRange(focus)?.length ?? 0) == 0 {
-            return CapturedInput(text: clipboardText ?? "", snapshot: nil, element: nil, window: nil)
-        }
-        // Read-only browser/PDF selections may live below the focused container.
-        if let focus, let selected = findSelection(focus, remaining: 100, depth: 0) {
-            return input(text: selected.1, element: selected.0, pid: pid)
-        }
-        guard copyIsEnabled(pid: pid) else {
-            return CapturedInput(text: clipboardText ?? "", snapshot: nil, element: nil, window: nil)
+        let route = SelectionCapturePolicy.route(range: focus.flatMap(selectedRange),
+                                                 isTextInput: focus.map(isTextInput) ?? false,
+                                                 copy: copyAvailability(pid: pid), selectionReported: selectionReported)
+        switch route {
+        case .clipboard: return captureClipboard()
+        case .unavailable: throw SelectionError.copyUnavailable
+        case .copySelection: break
         }
         let clipboard = try ClipboardSnapshot()
         let pasteboard = NSPasteboard.general
@@ -85,7 +88,9 @@ final class SelectionService {
                 let unchanged = sameFocus(pid: pid, original: focus)
                 clipboard.restore(ifChangeCount: copiedCount)
                 guard unchanged else { throw SelectionError.contextChanged }
-                guard let text, !text.isEmpty else { throw SelectionError.copyUnavailable }
+                guard let text = SelectionCapturePolicy.copiedSelection(text, clipboardChanged: true) else {
+                    throw SelectionError.copyUnavailable
+                }
                 // An unexposed selection is never eligible for a blind paste replacement.
                 return CapturedInput(text: text, snapshot: nil, element: nil, window: nil)
             }
@@ -94,10 +99,16 @@ final class SelectionService {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { continuation.resume() }
             }
         }
-        return CapturedInput(text: clipboard.text ?? "", snapshot: nil, element: nil, window: nil)
+        // A failed selection probe must never send unrelated clipboard contents.
+        throw SelectionError.copyUnavailable
     }
 
     func deliver(_ translation: String, to original: CapturedInput, contextWasInterrupted: Bool) -> DeliveryDecision {
+        if original.snapshot == nil {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(translation, forType: .string)
+            return .clipboard
+        }
         let currentFocus = focusedElement()
         let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? -1
         let current = currentFocus.map { snapshot($0, pid: pid) }
@@ -115,16 +126,18 @@ final class SelectionService {
         return original.snapshot?.isEditable == true ? .clipboardBecauseTargetChanged : .clipboard
     }
 
-    private func input(text: String, element: AXUIElement, pid: pid_t) -> CapturedInput {
-        CapturedInput(text: text, snapshot: snapshot(element, pid: pid), element: element,
-                      window: elementAttribute(element, kAXWindowAttribute))
+    private func input(text: String, element: AXUIElement, pid: pid_t) throws -> CapturedInput {
+        let captured = snapshot(element, pid: pid)
+        guard captured.selectedText == text else { throw SelectionError.contextChanged }
+        return CapturedInput(text: text, snapshot: captured, element: element,
+                             window: elementAttribute(element, kAXWindowAttribute))
     }
 
     private func snapshot(_ element: AXUIElement, pid: pid_t) -> TextSnapshot {
         let window = elementAttribute(element, kAXWindowAttribute)
         return TextSnapshot(processID: pid, elementID: String(CFHash(element)),
                             windowID: window.map { String(CFHash($0)) }, range: selectedRange(element),
-                            selectedText: string(element, kAXSelectedTextAttribute) ?? "",
+                            selectedText: selectedText(element) ?? "",
                             fullText: boundedFullText(element), isEditable: isEditable(element))
     }
 
@@ -182,29 +195,54 @@ final class SelectionService {
         string(element, kAXSubroleAttribute) == kAXSecureTextFieldSubrole
     }
 
-    private func findSelection(_ element: AXUIElement, remaining: Int, depth: Int) -> (AXUIElement, String)? {
-        guard remaining > 0, depth < 5, !isSecure(element) else { return nil }
-        if let text = string(element, kAXSelectedTextAttribute), !text.isEmpty { return (element, text) }
+    private func selectedText(_ element: AXUIElement) -> String? {
+        if let text = string(element, kAXSelectedTextAttribute), !text.isEmpty { return text }
+        guard let range = selectedRange(element), range.length > 0, range.length <= 30_000 else { return nil }
+        var cfRange = CFRange(location: range.location, length: range.length)
+        if let parameter = AXValueCreate(.cfRange, &cfRange) {
+            var value: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString,
+                                                          parameter, &value) == .success,
+               let text = value as? String, !text.isEmpty { return text }
+        }
+        guard let full = boundedFullText(element) else { return nil }
+        return SelectionCapturePolicy.text(in: full, range: range)
+    }
+
+    private func findSelection(_ element: AXUIElement, budget: inout Int, depth: Int,
+                               selectionReported: inout Bool) -> (AXUIElement, String)? {
+        guard budget > 0, depth < 7, !isSecure(element) else { return nil }
+        budget -= 1
+        if let range = selectedRange(element), range.length > 0 { selectionReported = true }
+        if let text = selectedText(element) { return (element, text) }
         guard let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
-        var budget = remaining
         for child in children.prefix(20) {
-            budget -= 1
-            if let result = findSelection(child, remaining: min(budget, 20), depth: depth + 1) { return result }
+            if let result = findSelection(child, budget: &budget, depth: depth + 1, selectionReported: &selectionReported) { return result }
+            if budget == 0 { break }
         }
         return nil
     }
 
-    private func copyIsEnabled(pid: pid_t) -> Bool {
+    private func copyAvailability(pid: pid_t) -> CopyAvailability {
         let app = AXUIElementCreateApplication(pid)
-        guard let menu = elementAttribute(app, kAXMenuBarAttribute) else { return false }
+        guard let menu = elementAttribute(app, kAXMenuBarAttribute) else { return .unknown }
+        var budget = 200
+        var foundDisabled = false
+        var foundUnknown = false
         func visit(_ element: AXUIElement, depth: Int) -> Bool {
-            guard depth < 4 else { return false }
+            guard depth < 6, budget > 0 else { return false }
+            budget -= 1
             if string(element, "AXMenuItemCmdChar")?.uppercased() == "C",
-               (attribute(element, kAXEnabledAttribute) as? Bool) == true,
-               (attribute(element, "AXMenuItemCmdModifiers") as? Int ?? 0) == 0 { return true }
+               (attribute(element, "AXMenuItemCmdModifiers") as? Int) == 0 {
+                if let enabled = attribute(element, kAXEnabledAttribute) as? Bool {
+                    if enabled { return true }
+                    foundDisabled = true
+                } else { foundUnknown = true }
+            }
             let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
             return children.prefix(40).contains { visit($0, depth: depth + 1) }
         }
-        return visit(menu, depth: 0)
+        if visit(menu, depth: 0) { return .enabled }
+        return foundDisabled && !foundUnknown && budget > 0 ? .disabled : .unknown
     }
 }

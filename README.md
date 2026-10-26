@@ -29,12 +29,18 @@ not configured.
    explicit activation. DeepSeek is the initial profile; multiple profiles may
    use the same provider with different models, effort levels, or credentials.
 2. Fill in an HTTPS OpenAI-compatible base URL, model, effort, and API key. Click
-   **Save and activate**. The key is stored in macOS Keychain, isolated by profile
-   and endpoint origin; it is never stored in preferences or this repository.
+   **Save and activate**. Keys are stored as plaintext files in
+   `~/Library/Application Support/SelAtRans/Credentials`, isolated by profile and
+   endpoint origin. The directory is mode 0700 and files are mode 0600; keys never
+   enter preferences or this repository. Upgrading from 0.1.1 requires entering
+   each API key once again: legacy Keychain entries are never accessed or deleted.
 3. In **Shortcut and updates**, grant Accessibility permission in macOS System
    Settings. Permission is used to capture and safely replace selected text.
 4. Select text in another app and press **⇧⌘E** or **⇧⌘C**. Both shortcuts can be changed in
    settings if another app reserves it.
+   If the app cannot confirm the current selection, it stops instead of using
+   old clipboard text. After manually copying, use **Translate clipboard to
+   English/Chinese** from the indicator's right-click menu.
 
 DeepSeek's documented model IDs include `deepseek-flash` and `deepseek-v4-pro`.
 Its effort settings are service default, `none`, `low`, `high`, and `max`.

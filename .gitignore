@@ -9,6 +9,9 @@ dist/
 *.pem
 *.p12
 *.key
+*.credential
+Credentials/
+credentials/
 *.mobileprovision
 Secrets/
 secrets/
