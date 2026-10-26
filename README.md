@@ -15,6 +15,9 @@ adding another menu bar or Dock icon. macOS 13+; Apple Silicon and Intel.
 Translations stream into a nonactivating preview. Left-click the indicator to
 show/hide preview and status, drag to move it, and right-click for
 settings, pause/resume, or quit. Relaunch the application to reopen settings.
+The expanded preview follows the icon, fits short text, and grows with streamed
+output until its screen-aware height cap; longer output scrolls. Its rounded
+corners have no rectangular background in either appearance.
 Only a complete, validated response is written to a field or clipboard. A partial
 response remains visibly incomplete and cannot be copied from the preview.
 

@@ -26,6 +26,10 @@ Chinese. Both actions share the selected profile and all delivery protections.
   a request, can be collapsed, and retain only the latest result in memory. No
   partial result may be delivered or copied; a normal stop and stream terminator
   are required before replacement/clipboard output. Final results can be manually copied.
+- The expanded preview follows the floating icon continuously during dragging.
+  Its height fits current text/status, grows with streaming, and scrolls only at
+  the available-screen/420-point height cap. Short or empty output leaves no large
+  blank body. Rounded corners remain transparent in light and dark appearances.
 - Right click exposes settings, shortcut pause/resume, and quit.
 - No menu bar icon or Dock icon. Relaunching the app brings the indicator back.
 - Settings show a CRUD list of LLM profiles. Each has a name, endpoint, model,
@@ -90,6 +94,10 @@ Chinese. Both actions share the selected profile and all delivery protections.
     empty editable range still uses clipboard input without copying an editor line.
 17. API key CRUD does not invoke Keychain. Local files enforce private permissions,
     keep profiles/origins isolated, and refuse unsafe links or malformed data.
+18. Dragging moves the expanded preview with its icon; preview geometry stays
+    within the active display, adjusts above/below at edges, fits short output,
+    caps long output, and returns to compact height on the next request. Offscreen
+    rendering verifies transparent corners in both appearances.
 
 ## Provider references
 
