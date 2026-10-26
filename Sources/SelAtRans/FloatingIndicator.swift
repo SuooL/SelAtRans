@@ -1,5 +1,6 @@
 import AppKit
 import TranslationCore
+import FloatingUI
 
 enum IndicatorState {
     case idle, working, success, error, paused
@@ -34,10 +35,7 @@ final class FloatingIndicator: NSObject {
     private let panel: StatusPanel
     private let indicator = IndicatorView(frame: NSRect(x: 0, y: 0, width: 48, height: 48))
     private var toast: StatusPanel?
-    private var previewBody: NSTextView?
-    private var previewStatus: NSTextField?
-    private var previewTitle: NSTextField?
-    private var copyButton: NSButton?
+    private var previewCard: PreviewCardView?
     private var latestTranslation = ""
     private var pendingDelta = ""
     private var refreshTimer: Timer?
@@ -65,6 +63,7 @@ final class FloatingIndicator: NSObject {
         panel.contentView = indicator
         indicator.onClick = { [weak self] in self?.togglePreview() }
         indicator.onMenu = { [weak self] event in self?.showMenu(event) }
+        indicator.onDrag = { [weak self] in self?.layoutPreview() }
         indicator.onDragFinished = { [weak self] in self?.savePosition() }
         indicator.setAccessibilityElement(true)
         indicator.setAccessibilityRole(.image)
@@ -78,17 +77,18 @@ final class FloatingIndicator: NSObject {
         if NSScreen.screens.contains(where: { $0.visibleFrame.contains(frame) }) { panel.setFrameOrigin(proposed) }
         else { panel.setFrameOrigin(NSPoint(x: screen.maxX - 72, y: screen.midY)) }
         panel.orderFrontRegardless()
+        layoutPreview()
     }
 
     func beginTranslation(direction: TranslationDirection) {
         self.direction = direction
-        previewTitle?.stringValue = "SelAtRans · " + direction.label
+        previewCard?.setTitle("SelAtRans · " + direction.label)
         latestTranslation = ""
         pendingDelta = ""
         translationComplete = false
         refreshTimer?.invalidate()
         refreshTimer = nil
-        previewBody?.string = ""
+        previewCard?.setTranslation("")
         update(.working, message: "正在翻译 · " + direction.label, showToast: true)
     }
 
@@ -109,10 +109,9 @@ final class FloatingIndicator: NSObject {
         guard !pendingDelta.isEmpty else { return }
         let delta = pendingDelta
         pendingDelta = ""
-        previewBody?.textStorage?.append(NSAttributedString(string: delta, attributes: [
-            .font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.labelColor
-        ]))
-        if let previewBody { previewBody.scrollRangeToVisible(NSRange(location: previewBody.string.utf16.count, length: 0)) }
+        previewCard?.appendTranslation(delta)
+        layoutPreview()
+        previewCard?.scrollToEnd()
     }
 
     func update(_ state: IndicatorState, message: String, showToast: Bool = false, permissionWarning: Bool = false) {
@@ -126,9 +125,8 @@ final class FloatingIndicator: NSObject {
             if state == .success { translationComplete = !latestTranslation.isEmpty }
             else if state == .error { translationComplete = false }
         }
-        previewStatus?.stringValue = message
-        copyButton?.isEnabled = translationComplete
-        if showToast { showStatus() }
+        previewCard?.setStatus(message, canCopy: translationComplete)
+        if showToast { showStatus() } else { layoutPreview() }
     }
 
     func synchronizePermission(granted: Bool) {
@@ -142,12 +140,11 @@ final class FloatingIndicator: NSObject {
 
     func showStatus() {
         if let toast, toast.isVisible {
-            previewStatus?.stringValue = message
+            previewCard?.setStatus(message, canCopy: translationComplete)
+            layoutPreview()
             return
         }
-        let width: CGFloat = 380
-        let height: CGFloat = 260
-        let toast = StatusPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+        let toast = StatusPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 80),
                                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         toast.level = .floating
         toast.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -155,79 +152,51 @@ final class FloatingIndicator: NSObject {
         toast.isOpaque = false
         toast.backgroundColor = .clear
         toast.hasShadow = true
-        let effect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        effect.material = .hudWindow
-        effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 16
-        effect.layer?.masksToBounds = true
-        let title = NSTextField(labelWithString: "SelAtRans · " + direction.label)
-        title.font = .systemFont(ofSize: 11, weight: .semibold)
-        title.textColor = .secondaryLabelColor
-        title.frame = NSRect(x: 16, y: height - 30, width: width - 60, height: 14)
-        effect.addSubview(title)
-        previewTitle = title
-        let close = NSButton(title: "×", target: self, action: #selector(closePreview))
-        close.isBordered = false
-        close.frame = NSRect(x: width - 38, y: height - 36, width: 26, height: 26)
-        close.setAccessibilityLabel("收起译文")
-        effect.addSubview(close)
-        let status = NSTextField(wrappingLabelWithString: message)
-        status.font = .systemFont(ofSize: 11)
-        status.textColor = .secondaryLabelColor
-        status.frame = NSRect(x: 16, y: 12, width: width - 110, height: 32)
-        effect.addSubview(status)
-        previewStatus = status
-        let copy = NSButton(title: "复制译文", target: self, action: #selector(copyTranslation))
-        copy.bezelStyle = .rounded
-        copy.frame = NSRect(x: width - 94, y: 15, width: 80, height: 26)
-        copy.isEnabled = translationComplete
-        effect.addSubview(copy)
-        copyButton = copy
-        let scroll = NSScrollView(frame: NSRect(x: 16, y: 52, width: width - 32, height: height - 96))
-        scroll.hasVerticalScroller = true
-        scroll.drawsBackground = false
-        let text = NSTextView(frame: scroll.bounds)
-        text.isEditable = false
-        text.isSelectable = false
-        text.drawsBackground = false
-        text.font = .systemFont(ofSize: 13)
-        text.textColor = .labelColor
-        text.textContainerInset = NSSize(width: 2, height: 4)
-        text.isVerticallyResizable = true
-        text.isHorizontallyResizable = false
-        text.autoresizingMask = [.width]
-        text.textContainer?.widthTracksTextView = true
-        text.string = latestTranslation
+        let card = PreviewCardView(frame: NSRect(x: 0, y: 0, width: 380, height: 80))
+        card.setTitle("SelAtRans · " + direction.label)
+        card.setStatus(message, canCopy: translationComplete)
+        card.setTranslation(latestTranslation)
+        card.onClose = { [weak self] in self?.closePreview() }
+        card.onCopy = { [weak self] in self?.copyTranslation() }
         pendingDelta = ""
-        scroll.documentView = text
-        effect.addSubview(scroll)
-        previewBody = text
-        toast.contentView = effect
-        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(panel.frame) }?.visibleFrame ?? NSScreen.main!.visibleFrame
-        let x = min(max(panel.frame.midX - width / 2, screen.minX + 8), screen.maxX - width - 8)
-        let below = panel.frame.minY - height - 8
-        let y = below >= screen.minY + 8 ? below : min(panel.frame.maxY + 8, screen.maxY - height - 8)
-        toast.setFrameOrigin(NSPoint(x: x, y: y))
-        toast.orderFrontRegardless()
+        toast.contentView = card
+        previewCard = card
         self.toast = toast
+        layoutPreview()
+        toast.orderFrontRegardless()
+        card.scrollToEnd()
+    }
+
+    private func layoutPreview() {
+        guard let toast, let card = previewCard else { return }
+        let center = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main else { return }
+        let maximum = PreviewLayout.maximumSize(anchor: panel.frame, screen: screen.visibleFrame)
+        let size = card.preferredSize(maximum: maximum)
+        let frame = PreviewLayout.frame(anchor: panel.frame, size: size, screen: screen.visibleFrame)
+        let resized = toast.frame.size != frame.size
+        if toast.frame != frame { toast.setFrame(frame, display: true) }
+        if resized {
+            card.frame = NSRect(origin: .zero, size: frame.size)
+            card.needsLayout = true
+        }
+        card.layoutSubtreeIfNeeded()
+        if resized { toast.invalidateShadow() }
     }
 
     @objc private func closePreview() {
         flushPreview()
         toast?.orderOut(nil)
         toast = nil
-        previewBody = nil
-        previewStatus = nil
-        previewTitle = nil
-        copyButton = nil
+        previewCard = nil
     }
 
     @objc private func copyTranslation() {
         guard translationComplete else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(latestTranslation, forType: .string)
-        previewStatus?.stringValue = "译文已复制。"
+        previewCard?.setStatus("译文已复制。", canCopy: translationComplete)
+        layoutPreview()
     }
 
     private func savePosition() { preferences.indicatorOrigin = panel.frame.origin }
@@ -261,6 +230,7 @@ private final class IndicatorView: NSView {
     var state: IndicatorState = .idle { didSet { needsDisplay = true; updateAnimation() } }
     var onClick: (() -> Void)?
     var onMenu: ((NSEvent) -> Void)?
+    var onDrag: (() -> Void)?
     var onDragFinished: (() -> Void)?
     private var initialMouse: NSPoint?
     private var initialOrigin: NSPoint?
@@ -271,7 +241,11 @@ private final class IndicatorView: NSView {
     override var acceptsFirstResponder: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override var isOpaque: Bool { false }
+
     override func draw(_ dirtyRect: NSRect) {
+        NSColor.clear.setFill()
+        bounds.fill(using: .copy)
         let background = NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 2), xRadius: 15, yRadius: 15)
         NSColor(calibratedWhite: 0.10, alpha: 0.92).setFill()
         background.fill()
@@ -323,6 +297,7 @@ private final class IndicatorView: NSView {
         let x = min(max(initialOrigin.x + current.x - initialMouse.x, screen.minX), screen.maxX - window.frame.width)
         let y = min(max(initialOrigin.y + current.y - initialMouse.y, screen.minY), screen.maxY - window.frame.height)
         window.setFrameOrigin(NSPoint(x: x, y: y))
+        onDrag?()
     }
     override func mouseUp(with event: NSEvent) {
         if dragged { onDragFinished?() } else { onClick?() }

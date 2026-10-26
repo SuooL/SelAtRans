@@ -259,6 +259,7 @@ struct CoreChecks {
         print("PASS: 5 bidirectional streaming checks")
         runSelectionChecks()
         try runCredentialChecks()
-        print("All core checks passed (22 existing cases plus selection and local credential regressions).")
+        try await MainActor.run { try runPreviewChecks() }
+        print("All core checks passed, including selection, local credential, and preview regressions.")
     }
 }
