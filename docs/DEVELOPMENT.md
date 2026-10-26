@@ -63,6 +63,18 @@ Git or use real credentials in tests. API Keychain access has been removed.
 
 ## Manual verification
 
+README preview images use the actual native `PreviewCardView` with synthetic
+examples, rendered offscreen without showing a desktop window or sending API
+requests. Regenerate them from the repository root after changing the preview:
+
+```sh
+swiftc Sources/FloatingUI/PreviewCardView.swift scripts/render-readme-previews.swift -o /tmp/selatrans-readme-previews
+/tmp/selatrans-readme-previews
+```
+
+Keep the English and Simplified Chinese READMEs aligned. `docs/assets/app-icon.png`
+is copied from `build/AppIcon.iconset/icon_128x128.png` after app packaging.
+
 Accessibility and cross-application integration require a logged-in macOS desktop.
 Use synthetic, non-sensitive text and verify each acceptance check in
 `REQUIREMENTS.md`. Never include source text, keys, or translations in screenshots,
