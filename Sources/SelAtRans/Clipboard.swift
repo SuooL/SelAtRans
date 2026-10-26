@@ -3,10 +3,8 @@ import AppKit
 @MainActor
 struct ClipboardSnapshot {
     private let items: [[NSPasteboard.PasteboardType: Data]]
-    let text: String?
 
     init(_ pasteboard: NSPasteboard = .general) throws {
-        text = pasteboard.string(forType: .string)
         let sourceItems = pasteboard.pasteboardItems ?? []
         // Avoid materializing large image/file clipboard payloads for a selection probe.
         let heavyTypes: Set<NSPasteboard.PasteboardType> = [.tiff, .png, .fileURL, .pdf]

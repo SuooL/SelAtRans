@@ -3,7 +3,15 @@
 Do not open public issues containing credentials, private text, patient data,
 API request/response bodies, or personal settings.
 
-SelAtRans stores API keys in the macOS login Keychain, scoped to endpoint origin.
+SelAtRans stores API keys as plaintext files in
+`~/Library/Application Support/SelAtRans/Credentials`, scoped to profile and
+endpoint origin. The app enforces mode 0700 on the credential directory and mode
+0600 on regular, current-user-owned credential files, rejects symlinks and hard
+links on reads, and saves atomically without a world-readable intermediate file.
+This avoids Keychain password prompts but does not provide encryption at rest;
+other processes running as the same user can access these files. Keep them out
+of shared directories and Git. App API credentials never use Keychain; legacy
+items are left untouched, so upgrades require one-time key re-entry.
 Ordinary preferences contain only non-secret options. User text is held in memory
 and sent only to the configured HTTPS provider after a deliberate shortcut.
 The provider's own retention and processing policies apply to that request.
