@@ -1,0 +1,8 @@
+title = "SelAtRans secret detection"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated build products and Git internals"
+paths = ['''(^|/)\.git/''', '''(^|/)\.build/''', '''(^|/)build/''', '''(^|/)dist/''']

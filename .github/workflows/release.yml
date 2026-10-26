@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stable-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and prepare release for local signing
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Verify release is the current main version
+        run: |
+          set -euo pipefail
+          test "$(cat VERSION)" = "${GITHUB_REF_NAME#v}"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          python3 scripts/version.py check
+      - name: Validate and scan before accessing signing material
+        run: |
+          scripts/check.sh
+          scripts/secret-scan.sh --history
+      - name: Build universal app, DMG, and checksums
+        run: scripts/package-release.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SelAtRans-release-staging
+          path: dist/SelAtRans.zip
+          retention-days: 14

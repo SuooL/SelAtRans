@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+scripts/ci-test.sh
+git diff --cached --check
