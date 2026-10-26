@@ -20,7 +20,7 @@ ditto -x -k "$staging/download/SelAtRans.zip" "$staging/unpacked"
 app="$staging/unpacked/SelAtRans.app"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")" == "$version" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")" == io.github.suool.SelAtRans ]]
-lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/SelAtRans"
+lipo "$app/Contents/MacOS/SelAtRans" -verify_arch arm64 x86_64
 REQUIRE_STABLE_SIGNING=1 scripts/sign-app.sh "$app"
 mkdir -p dist "$staging/appcast" "$staging/dmg"
 ditto -c -k --sequesterRsrc --keepParent "$app" dist/SelAtRans.zip

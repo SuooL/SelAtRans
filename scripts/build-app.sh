@@ -18,7 +18,7 @@ if [[ "${1:-}" == --universal ]]; then
     swift build --scratch-path .build -c "$configuration" --triple "$other_triple"
     other_dir="$(swift build --scratch-path .build -c "$configuration" --triple "$other_triple" --show-bin-path)"
     lipo -create "$binary_dir/SelAtRans" "$other_dir/SelAtRans" -output "$app/Contents/MacOS/SelAtRans"
-    lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/SelAtRans"
+    lipo "$app/Contents/MacOS/SelAtRans" -verify_arch arm64 x86_64
 fi
 framework=.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
 ditto "$framework" "$app/Contents/Frameworks/Sparkle.framework"
