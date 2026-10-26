@@ -257,6 +257,8 @@ struct CoreChecks {
         await streaming.testStreamingOutputLimit()
         await streaming.testCancellationIsPreserved()
         print("PASS: 5 bidirectional streaming checks")
-        print("All 22 core checks passed.")
+        runSelectionChecks()
+        try runCredentialChecks()
+        print("All core checks passed (22 existing cases plus selection and local credential regressions).")
     }
 }

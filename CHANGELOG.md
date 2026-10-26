@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+- Store LLM API keys in private local files instead of Keychain, avoiding password prompts.
+- Require one-time key re-entry after upgrading; never access legacy API Keychain entries.
+- Distinguish missing selection metadata from an explicitly empty selection.
+- Read selected text through Accessibility ranges when direct selected text is unavailable.
+- Refuse ambiguous or timed-out selection capture instead of translating stale clipboard text.
+- Add explicit clipboard translation actions to the floating indicator's right-click menu.
+
 ## 0.1.1
 
 - Publish the first signed update feed and universal macOS release.

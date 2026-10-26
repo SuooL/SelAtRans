@@ -46,6 +46,7 @@ final class FloatingIndicator: NSObject {
     private var permissionWarningIsVisible = false
     var onSettings: (() -> Void)?
     var onTogglePause: (() -> Void)?
+    var onTranslateClipboard: ((TranslationDirection) -> Void)?
     var isPaused = false
     private(set) var message = "就绪 · ⇧⌘E 英文 · ⇧⌘C 中文"
 
@@ -235,6 +236,12 @@ final class FloatingIndicator: NSObject {
         let menu = NSMenu()
         menu.addItem(withTitle: "SelAtRans · \(preferences.shortcut.label)", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
+        for (title, selector) in [("翻译剪贴板为英文", #selector(clipboardEnglish)), ("翻译剪贴板为中文", #selector(clipboardChinese))] {
+            let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+            item.target = self
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
         for (title, selector) in [("设置…", #selector(settings)), (isPaused ? "恢复快捷键" : "暂停快捷键", #selector(togglePause)), ("退出 SelAtRans", #selector(quit))] {
             let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
             item.target = self
@@ -243,6 +250,8 @@ final class FloatingIndicator: NSObject {
         NSMenu.popUpContextMenu(menu, with: event, for: indicator)
     }
     @objc private func settings() { onSettings?() }
+    @objc private func clipboardEnglish() { onTranslateClipboard?(.toEnglish) }
+    @objc private func clipboardChinese() { onTranslateClipboard?(.toChinese) }
     @objc private func togglePause() { onTogglePause?() }
     @objc private func quit() { NSApp.terminate(nil) }
 }
