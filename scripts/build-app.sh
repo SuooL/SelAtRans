@@ -13,9 +13,12 @@ fi
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 cp "$binary_dir/SelAtRans" "$app/Contents/MacOS/SelAtRans"
 if [[ "${1:-}" == --universal ]]; then
-    swift build --scratch-path .build -c "$configuration" --triple x86_64-apple-macosx13.0
-    intel_dir="$(swift build --scratch-path .build -c "$configuration" --triple x86_64-apple-macosx13.0 --show-bin-path)"
-    lipo -create "$binary_dir/SelAtRans" "$intel_dir/SelAtRans" -output "$app/Contents/MacOS/SelAtRans"
+    if [[ "$(uname -m)" == arm64 ]]; then other_arch=x86_64; else other_arch=arm64; fi
+    other_triple="${other_arch}-apple-macosx13.0"
+    swift build --scratch-path .build -c "$configuration" --triple "$other_triple"
+    other_dir="$(swift build --scratch-path .build -c "$configuration" --triple "$other_triple" --show-bin-path)"
+    lipo -create "$binary_dir/SelAtRans" "$other_dir/SelAtRans" -output "$app/Contents/MacOS/SelAtRans"
+    lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/SelAtRans"
 fi
 framework=.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
 ditto "$framework" "$app/Contents/Frameworks/Sparkle.framework"
