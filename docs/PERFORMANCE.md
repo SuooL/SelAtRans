@@ -8,6 +8,9 @@
   translation and removed on every completion, error, or termination path.
 - The progress ring runs at 15 FPS only while working. Streaming preview updates
   are coalesced to at most 10 per second with one-shot timers; idle drawing is static.
+- Preview sizing caches text/status measurements at the current width. Dragging
+  updates the anchor position without remeasuring unchanged text. No extra timer
+  or screen-position polling is used; long output scrolls within a bounded panel.
 - The configuration window's SwiftUI view tree is released after closing.
 - A shared ephemeral URLSession reuses connections without disk cache, cookies,
   or stored HTTP credentials. Its redirect delegate does not form a retain cycle.

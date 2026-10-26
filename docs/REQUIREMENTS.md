@@ -26,10 +26,14 @@ Chinese. Both actions share the selected profile and all delivery protections.
   a request, can be collapsed, and retain only the latest result in memory. No
   partial result may be delivered or copied; a normal stop and stream terminator
   are required before replacement/clipboard output. Final results can be manually copied.
+- The expanded preview follows the floating icon continuously during dragging.
+  Its height fits current text/status, grows with streaming, and scrolls only at
+  the available-screen/420-point height cap. Short or empty output leaves no large
+  blank body. Rounded corners remain transparent in light and dark appearances.
 - Right click exposes settings, shortcut pause/resume, and quit.
 - No menu bar icon or Dock icon. Relaunching the app brings the indicator back.
 - Settings show a CRUD list of LLM profiles. Each has a name, endpoint, model,
-  reasoning effort, and independent Keychain credential. Choose one saved profile
+  reasoning effort, and independent local credential. Choose one saved profile
   as active; there is no implicit fallback to a different provider.
 - DeepSeek is the initial provider. Its effort choices are provider default,
   none, low, high, and max. Generic compatible endpoints also expose minimal,
@@ -44,11 +48,20 @@ Chinese. Both actions share the selected profile and all delivery protections.
   cannot be accidentally persisted as part of endpoint configuration.
 - API keys are scoped to profile UUID and endpoint origin. Changing provider cannot silently
   send the previous provider's key to another host.
+- Store API keys as plaintext files in `~/Library/Application Support/SelAtRans/Credentials`,
+  with 0700 directory and 0600 file permissions. API credentials do not use Keychain;
+  require one-time re-entry after upgrading, without accessing/deleting legacy items.
+  Apple signing and Sparkle publishing keys remain in the maintainer Keychain.
 - If Accessibility cannot safely replace an editable selection, copy the result
   and show a fallback. Never synthesize a paste into an unverified target.
 - Read selection through Accessibility first. A bounded Command-C fallback may
   temporarily use the clipboard for apps that do not expose selected text; restore
   prior clipboard representations after capture if no newer clipboard write occurred.
+- Missing selection metadata, an unrecognized Copy command, or a timed-out copy
+  does not prove that no selection exists. Stop with an actionable error rather
+  than silently translating an unrelated previous clipboard value. Read AX text
+  ranges when direct selected text is unavailable. Explicit right-click clipboard
+  translation is always available and does not require Accessibility access.
 - No automatic retry, text history, or automatic submission/Enter key.
 - Target-language preservation is requested from the model; no unreliable local
   language guess silently bypasses the user's request.
@@ -76,6 +89,15 @@ Chinese. Both actions share the selected profile and all delivery protections.
     rejects disconnects, malformed/truncated output, or oversized responses.
 15. Local/release builds share a certificate-backed identity across changed code;
     CI ad-hoc artifacts are staging only and cannot be published directly.
+16. Omitted AX range metadata probes an enabled Copy command instead of using the
+    clipboard. A failed/ambiguous selection probe sends no API request. An explicit
+    empty editable range still uses clipboard input without copying an editor line.
+17. API key CRUD does not invoke Keychain. Local files enforce private permissions,
+    keep profiles/origins isolated, and refuse unsafe links or malformed data.
+18. Dragging moves the expanded preview with its icon; preview geometry stays
+    within the active display, adjusts above/below at edges, fits short output,
+    caps long output, and returns to compact height on the next request. Offscreen
+    rendering verifies transparent corners in both appearances.
 
 ## Provider references
 

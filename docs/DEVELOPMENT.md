@@ -34,7 +34,9 @@ gh pr checks --watch
 
 PR titles use `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, or `release:`.
 The complete local gate is `scripts/ci-test.sh`. It must pass before every commit
-and before PR creation; the pre-commit hook enforces it. Never bypass the hook.
+and before PR creation. The pre-commit hook enforces it before commits;
+`scripts/pr.sh` requires a clean checkout and repeats it before creating a PR.
+Never bypass the hook or use direct PR creation to skip the local gate.
 `check.sh` validates shell syntax, workflow/version rules, whitespace, the core
 checks, a production build, and signed app packaging. It requires macOS Command
 Line Tools, Python 3, and network access for pinned build dependencies.
@@ -54,9 +56,10 @@ setting uses the PR body, preserving attribution after feature merge. The
 `commit-msg` hook verifies attribution; tests cover all three supported agents.
 
 Secret scanning uses checksum-pinned Gitleaks. The local pre-commit hook scans
-the working tree; CI scans the tree and complete fetched Git history. Ignored
-local credentials are never an acceptable configuration mechanism for this app:
-enter keys in the settings window and store them in Keychain instead.
+the working tree and history; CI also scans the complete fetched Git history.
+Enter keys in the settings window; the app stores them in its private Application
+Support directory, outside the repository. Never add local credential files to
+Git or use real credentials in tests. API Keychain access has been removed.
 
 ## Manual verification
 

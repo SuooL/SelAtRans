@@ -24,7 +24,7 @@ final class SettingsModel: ObservableObject {
     var onSaved: (() -> Void)?
     var onPermissionChanged: ((Bool) -> Void)?
     private let preferences: Preferences
-    private let keychain = KeychainStore()
+    private let credentials = CredentialStore()
     private var recorder: Any?
     private var testTask: Task<Void, Never>?
 
@@ -50,7 +50,7 @@ final class SettingsModel: ObservableObject {
         hasPermission = AXIsProcessTrusted()
         onPermissionChanged?(hasPermission)
         if let profile = editedProfile, let account = try? profile.credentialAccount() {
-            hasSavedKey = (try? keychain.read(account: account)) != nil
+            hasSavedKey = (try? credentials.read(account: account)) != nil
         } else { hasSavedKey = false }
     }
 
@@ -85,7 +85,7 @@ final class SettingsModel: ObservableObject {
     func deleteProfile() {
         guard !isTesting, let id = selectedID else { return }
         do {
-            try keychain.deleteProfile(id: id)
+            try credentials.deleteProfile(id: id)
             collection.remove(id: id)
             preferences.profiles = collection
             select(collection.profiles.first?.id)
@@ -102,7 +102,7 @@ final class SettingsModel: ObservableObject {
             if !key.isEmpty {
                 let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedKey.isEmpty else { throw TranslationError.missingKey }
-                try keychain.save(trimmedKey, account: profile.credentialAccount())
+                try credentials.save(trimmedKey, account: profile.credentialAccount())
             }
             guard let index = collection.profiles.firstIndex(where: { $0.id == profile.id }) else { return false }
             collection.profiles[index] = profile
@@ -110,7 +110,7 @@ final class SettingsModel: ObservableObject {
             preferences.hasCompletedSetup = true
             key = ""
             refresh()
-            message = "配置已保存。密钥仅存于 macOS 钥匙串。"
+            message = "配置已保存。密钥仅存于本机私有目录。"
             onSaved?()
             return true
         } catch { message = error.localizedDescription; return false }
@@ -119,7 +119,7 @@ final class SettingsModel: ObservableObject {
     func activateSelected() {
         guard save(), let profile = editedProfile else { return }
         do {
-            guard let saved = try keychain.read(account: profile.credentialAccount()), !saved.isEmpty else { throw TranslationError.missingKey }
+            guard let saved = try credentials.read(account: profile.credentialAccount()), !saved.isEmpty else { throw TranslationError.missingKey }
             collection.activeID = profile.id
             preferences.profiles = collection
             message = "已启用：\(profile.name)"
@@ -130,7 +130,7 @@ final class SettingsModel: ObservableObject {
     func deleteKey() {
         guard let profile = editedProfile else { return }
         do {
-            try keychain.delete(account: profile.credentialAccount())
+            try credentials.delete(account: profile.credentialAccount())
             key = ""
             refresh()
             message = "已删除当前配置、当前服务地址的密钥。"
@@ -146,7 +146,7 @@ final class SettingsModel: ObservableObject {
             guard let self else { return }
             defer { isTesting = false; testTask = nil }
             do {
-                let selectedKey = try typedKey.isEmpty ? keychain.read(account: profile.credentialAccount()) ?? "" : typedKey
+                let selectedKey = try typedKey.isEmpty ? credentials.read(account: profile.credentialAccount()) ?? "" : typedKey
                 _ = try await TranslationClient().translate("你好，祝你今天愉快。", configuration: profile.configuration, key: selectedKey)
                 try Task.checkCancellation()
                 message = "连接成功，模型已返回完整译文。测试不会自动保存设置。"
@@ -215,7 +215,7 @@ struct SettingsView: View {
                 .font(.callout).lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading).padding(10)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            Text("仅在触发时发送文字 · 无翻译历史 · 密钥仅存于钥匙串").font(.caption).foregroundStyle(.secondary)
+            Text("仅在触发时发送文字 · 无翻译历史 · 密钥仅存于本机私有文件").font(.caption).foregroundStyle(.secondary)
         }
         .padding(24).frame(width: 840)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refresh() }
@@ -224,7 +224,7 @@ struct SettingsView: View {
         .alert("删除这个 LLM 配置？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
             Button("删除配置与密钥", role: .destructive) { model.deleteProfile() }
-        } message: { Text("会删除此配置及其钥匙串密钥，不影响其他配置。") }
+        } message: { Text("会删除此配置及其本地密钥，不影响其他配置。") }
     }
 
     private var profiles: some View {
@@ -269,11 +269,13 @@ struct SettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     field("API Key") { SecureField(model.hasSavedKey ? "已保存；留空保持不变" : "输入此配置的密钥", text: $model.key) }
                     HStack {
-                        Label(model.hasSavedKey ? "此配置的密钥已保存" : "密钥按配置和服务地址隔离", systemImage: "lock.shield")
+                        Label(model.hasSavedKey ? "此配置的密钥已保存" : "未保存本地密钥；旧版升级后请重新填写一次", systemImage: "lock.shield")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
                         if model.hasSavedKey { Button("删除密钥", role: .destructive) { model.deleteKey() }.font(.caption) }
                     }
+                    Text("密钥文件不加密，仅当前用户可读写；不再访问旧版钥匙串条目。")
+                        .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     HStack {
                         Button("删除配置", role: .destructive) { confirmDelete = true }
@@ -290,6 +292,7 @@ struct SettingsView: View {
     }
 
     private var general: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -322,7 +325,8 @@ struct SettingsView: View {
             Spacer()
             Text("输入框选区直接替换，剪贴板不变；其他位置的文字翻译后复制到剪贴板。若翻译期间原窗口或选区变化，将保留原文并复制译文。")
                 .font(.callout).foregroundStyle(.secondary)
-        }.padding(18).frame(height: 350)
+        }.padding(18)
+        }.frame(height: 350)
     }
 
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
