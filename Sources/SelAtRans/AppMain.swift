@@ -53,6 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chineseHotKey.unregister()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        indicator.synchronizePermission(granted: selection.isTrusted)
+    }
+
     private func translate(direction: TranslationDirection) {
         guard !paused, translationTask == nil else { return }
         indicator.beginTranslation(direction: direction)
@@ -83,7 +87,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch is CancellationError {
                 indicator.update(.idle, message: "翻译已取消，原文已保留。")
             } catch {
-                indicator.update(.error, message: error.localizedDescription, showToast: true)
+                let needsPermission: Bool
+                if let problem = error as? SelectionError, case .permission = problem { needsPermission = true }
+                else { needsPermission = false }
+                indicator.update(.error, message: error.localizedDescription, showToast: true, permissionWarning: needsPermission)
             }
         }
     }
@@ -125,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self, translationTask == nil else { return }
                 indicator.update(paused ? .paused : .idle, message: paused ? "快捷键已暂停。" : "就绪 · \(preferences.shortcut.label) 英文 · \(preferences.chineseShortcut.label) 中文")
             }
+            model.onPermissionChanged = { [weak self] granted in self?.indicator.synchronizePermission(granted: granted) }
             settings = SettingsWindowController(model: model, onPermission: { [weak self] in
                 self?.selection.requestPermission()
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {

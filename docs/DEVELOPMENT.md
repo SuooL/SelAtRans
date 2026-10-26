@@ -22,8 +22,7 @@ supports a single maintainer; passing CI is not independent human review.
 git fetch origin
 git switch -c feature/my-change origin/dev
 git config core.hooksPath .githooks
-scripts/check.sh
-scripts/secret-scan.sh
+scripts/ci-test.sh
 git add <specific-files>
 git diff --cached --check
 git commit -m 'feat: describe the resulting behavior'
@@ -34,7 +33,8 @@ gh pr checks --watch
 ```
 
 PR titles use `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, or `release:`.
-The complete local gate is `scripts/check.sh` plus `scripts/secret-scan.sh`.
+The complete local gate is `scripts/ci-test.sh`. It must pass before every commit
+and before PR creation; the pre-commit hook enforces it. Never bypass the hook.
 `check.sh` validates shell syntax, workflow/version rules, whitespace, the core
 checks, a production build, and signed app packaging. It requires macOS Command
 Line Tools, Python 3, and network access for pinned build dependencies.

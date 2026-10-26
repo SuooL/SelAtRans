@@ -36,7 +36,8 @@
 
 ## Verification
 
-- Run `scripts/check.sh` and `scripts/secret-scan.sh` before committing.
+- Run `scripts/ci-test.sh` and require a pass before committing or creating any PR.
+  The pre-commit hook enforces this full local CI gate. Do not use --no-verify.
 - Install local hooks with `git config core.hooksPath .githooks`.
 - Use meaningful unit tests for routing, request validation, API error handling,
   and input-change protection. Network tests use synthetic text and fake keys.

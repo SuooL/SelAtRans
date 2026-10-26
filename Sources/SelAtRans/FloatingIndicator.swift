@@ -43,6 +43,7 @@ final class FloatingIndicator: NSObject {
     private var refreshTimer: Timer?
     private var translationComplete = false
     private var direction: TranslationDirection = .toEnglish
+    private var permissionWarningIsVisible = false
     var onSettings: (() -> Void)?
     var onTogglePause: (() -> Void)?
     var isPaused = false
@@ -113,7 +114,8 @@ final class FloatingIndicator: NSObject {
         if let previewBody { previewBody.scrollRangeToVisible(NSRange(location: previewBody.string.utf16.count, length: 0)) }
     }
 
-    func update(_ state: IndicatorState, message: String, showToast: Bool = false) {
+    func update(_ state: IndicatorState, message: String, showToast: Bool = false, permissionWarning: Bool = false) {
+        permissionWarningIsVisible = permissionWarning
         self.message = message
         indicator.state = state
         indicator.toolTip = message + "\n左键查看状态 · 拖动移动 · 右键设置"
@@ -126,6 +128,11 @@ final class FloatingIndicator: NSObject {
         previewStatus?.stringValue = message
         copyButton?.isEnabled = translationComplete
         if showToast { showStatus() }
+    }
+
+    func synchronizePermission(granted: Bool) {
+        guard granted, permissionWarningIsVisible else { return }
+        update(isPaused ? .paused : .idle, message: isPaused ? "已授权 · 快捷键已暂停。" : "已授权 · \(preferences.shortcut.label) 英文 · \(preferences.chineseShortcut.label) 中文")
     }
 
     private func togglePreview() {

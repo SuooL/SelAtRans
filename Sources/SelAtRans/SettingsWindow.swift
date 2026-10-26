@@ -22,6 +22,7 @@ final class SettingsModel: ObservableObject {
     let updater: AppUpdater
     var onShortcut: ((TranslationDirection, Shortcut) throws -> Void)?
     var onSaved: (() -> Void)?
+    var onPermissionChanged: ((Bool) -> Void)?
     private let preferences: Preferences
     private let keychain = KeychainStore()
     private var recorder: Any?
@@ -47,6 +48,7 @@ final class SettingsModel: ObservableObject {
 
     func refresh() {
         hasPermission = AXIsProcessTrusted()
+        onPermissionChanged?(hasPermission)
         if let profile = editedProfile, let account = try? profile.credentialAccount() {
             hasSavedKey = (try? keychain.read(account: account)) != nil
         } else { hasSavedKey = false }
