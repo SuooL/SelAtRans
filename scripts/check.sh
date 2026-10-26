@@ -14,7 +14,7 @@ checks_dir="$(swift build --scratch-path .build --show-bin-path)"
 codesign --force --sign - --timestamp=none "$checks_dir/CoreChecks"
 codesign --verify --strict "$checks_dir/CoreChecks"
 "$checks_dir/CoreChecks"
-scripts/build-app.sh
+scripts/build-app.sh --universal
 if [[ "${GITHUB_ACTIONS:-}" != true && "${SIGNING_MODE:-}" != ci-adhoc ]]; then
     python3 -B scripts/verify-signing.py
 fi
