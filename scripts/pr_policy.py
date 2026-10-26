@@ -16,7 +16,8 @@ def validate(event):
         assert head == "dev" and same_repo, "Only this repository's dev branch may target main."
     else:
         assert base == "dev", "Feature PRs must target dev."
-        assert re.fullmatch(r"(feature|fix|chore)/[a-zA-Z0-9._/-]+", head), "Use a feature/*, fix/*, or chore/* branch."
+        dependency_bot = same_repo and pr.get("user", {}).get("login") == "dependabot[bot]" and head.startswith("dependabot/github_actions/")
+        assert dependency_bot or re.fullmatch(r"(feature|fix|hotfix|chore)/[a-zA-Z0-9._/-]+", head), "Use a feature/*, fix/*, hotfix/*, or chore/* branch."
     assert re.match(r"^(feat|fix|chore|docs|test|ci|release)(\([^\n]+\))?: .+", pr["title"]), "Use a conventional PR title."
 
 
