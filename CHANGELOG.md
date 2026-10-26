@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Publish the first signed update feed and universal macOS release.
+- Clear stale floating Accessibility warnings when permission is granted.
+- Explain an unpublished update feed in Chinese instead of showing a generic error.
+- Keep permission and update information accessible in a scrolling settings panel.
+- Require the complete local CI gate before commits and pull requests.
+
 ## 0.1.0
 
 - Translate editable selections in place using Shift–Command–E (English) or Shift–Command–C (Chinese).
