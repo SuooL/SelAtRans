@@ -290,6 +290,7 @@ struct SettingsView: View {
     }
 
     private var general: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -322,7 +323,8 @@ struct SettingsView: View {
             Spacer()
             Text("输入框选区直接替换，剪贴板不变；其他位置的文字翻译后复制到剪贴板。若翻译期间原窗口或选区变化，将保留原文并复制译文。")
                 .font(.callout).foregroundStyle(.secondary)
-        }.padding(18).frame(height: 350)
+        }.padding(18)
+        }.frame(height: 350)
     }
 
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
